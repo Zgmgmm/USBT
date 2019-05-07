@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">USBScanner</string>
+    <string name="sample_barcode">6940456766566654</string>
+    <string name="sample_barcode_history">6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654</string>
+    <string name="auto_option">auto send</string>
+    <string name="btn_auto">Auto</string>
+    <string name="btn_send">Send</string>
+    <string name="btn_clear">Clear</string>
+    <string name="sample_port">2333</string>
+    <string name="sample_title_port">PORT:</string>
+</resources>
