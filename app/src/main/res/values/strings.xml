@@ -1,11 +1,31 @@
 <resources>
     <string name="app_name">USBScanner</string>
     <string name="sample_barcode">6940456766566654</string>
-    <string name="sample_barcode_history">6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654</string>
+    <string name="sample_barcode_history">
+        6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654\n6940456766566654
+    </string>
     <string name="auto_option">auto send</string>
-    <string name="btn_auto">Auto</string>
+    <string name="btn_auto">Auto Send</string>
     <string name="btn_send">Send</string>
     <string name="btn_clear">Clear</string>
-    <string name="sample_port">2333</string>
-    <string name="sample_title_port">PORT:</string>
+    <string name="sample_port_title">2333</string>
+    <string name="sample_title_port">Port:</string>
+    <string name="config">config</string>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Strings related to Settings -->
+
+    <string name="set_port">Set port</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="btn_reboot">Reboot</string>
+    <string name="hint_barcode_view"><![CDATA[<barcode>]]></string>
+    <string name="sample_sent_title">Sent:</string>
+    <string name="sample_clients_title">Clients:</string>
+    <string name="no_barcode_to_send">Please input a barcode</string>
+    <string name="no_clients_to_send">no clients</string>
+    <string name="barcode_sent">barcode sent</string>
+    <string name="on_reboot">Sure to reboot?</string>
+    <string name="sample_clients">0</string>
+    <string name="sample_sent">0</string>
 </resources>

@@ -5,19 +5,28 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        tools:context=".MainActivity">
+        tools:context=".MainActivity"
+        android:keepScreenOn="true">
 
     <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2">
+            android:layout_weight="4">
         <ListView
                 android:id="@+id/listHistory"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
                 android:layout_gravity="center|bottom"
+                tools:listitem="@layout/item_list_history"
         />
     </FrameLayout>
+    <View
+            android:layout_width="match_parent"
+            android:layout_height="5dp"
+            android:background="@drawable/dash_line"
+            android:layerType="software"/>
     <TextView
             android:id="@+id/txtBarcode"
             android:layout_width="match_parent"
@@ -26,12 +35,12 @@
             android:paddingTop="4dp"
             android:gravity="center|top"
             android:textSize="32sp"
-            android:text="@string/sample_barcode"
-            android:textColor="#000"
+            android:hint="@string/hint_barcode_view"
     />
     <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:padding="4dp">
         <TextView
                 android:layout_width="wrap_content"
@@ -44,7 +53,35 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:textColor="@color/colorPrimary"
-                android:text="@string/sample_port"
+                android:text="@string/sample_port_title"
+        />
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:text="@string/sample_clients_title"
+        />
+        <TextView
+                android:id="@+id/txtClients"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:textColor="@color/colorPrimary"
+                android:text="@string/sample_clients"
+        />
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:text="@string/sample_sent_title"
+        />
+        <TextView
+                android:id="@+id/txtSent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:textColor="@color/colorPrimary"
+                android:text="@string/sample_sent"
         />
     </LinearLayout>
     <LinearLayout
@@ -53,8 +90,7 @@
         <Switch
                 android:id="@+id/swtAutoSend"
                 android:layout_height="wrap_content"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="wrap_content"
                 android:text="@string/btn_auto"/>
         <Button
                 android:id="@+id/btnSend"

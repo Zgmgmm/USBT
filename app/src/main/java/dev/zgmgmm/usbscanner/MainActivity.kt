@@ -1,19 +1,22 @@
 package dev.zgmgmm.usbscanner
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.view.ViewGroup
+import android.text.InputType
+import android.view.*
 import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
+import com.google.zxing.Result
 import dev.zgmgmm.esls.receiver.ZKCScanCodeBroadcastReceiver
 import kotlinx.android.synthetic.main.activity_main.*
-import org.jetbrains.anko.AnkoLogger
-import org.jetbrains.anko.debug
-import org.jetbrains.anko.find
+import me.dm7.barcodescanner.zxing.ZXingScannerView
+import org.jetbrains.anko.*
+import java.io.Closeable
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.ServerSocketChannel
@@ -23,14 +26,19 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.LinkedBlockingQueue
 
 
-class MainActivity : AppCompatActivity(), AnkoLogger {
+class MainActivity : AppCompatActivity(),AnkoLogger {
+
     private lateinit var adapter: HistoryListAdapter
-    private var autoSend: Boolean = false
+    private var autoSend: Boolean = true
     private lateinit var ssc: ServerSocketChannel
     private val channels = CopyOnWriteArrayList<SocketChannel>()
     private var port = 2333
     private var queue = LinkedBlockingQueue<String>()
     private lateinit var receiver: ZKCScanCodeBroadcastReceiver
+    private lateinit var listenThread: Thread
+    private lateinit var sendThread: Thread
+    private var toast: Toast? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -43,35 +51,24 @@ class MainActivity : AppCompatActivity(), AnkoLogger {
             txtBarcode.text = adapter.getItem(position)
         }
 
-        // view of info
-        txtPort.text = port.toString()
-        txtPort.setOnLongClickListener {
-            // TODO
-            // show input dialog
-            true
-        }
-
 
         // buttons
+        swtAutoSend.isChecked = autoSend
         swtAutoSend.setOnCheckedChangeListener { _, isChecked ->
             autoSend = isChecked
         }
 
         btnSend.setOnClickListener {
-            queue.put(txtBarcode.text as String)
+            send(txtBarcode.text as String)
         }
 
         btnClear.setOnClickListener {
-            adapter.clear()
+            clearHistory()
         }
 
-        Thread {
-            listen(port)
-        }.start()
-
-        Thread {
-            sendLoop()
-        }.start()
+        // start server
+        listen(port)
+        sendLoop()
 
         // register receiver
         receiver = ZKCScanCodeBroadcastReceiver.register(this, this::onResult)
@@ -80,6 +77,7 @@ class MainActivity : AppCompatActivity(), AnkoLogger {
     override fun onDestroy() {
         // unregister receiver
         this.unregisterReceiver(receiver)
+        stopServer()
         super.onDestroy()
     }
 
@@ -89,57 +87,162 @@ class MainActivity : AppCompatActivity(), AnkoLogger {
         return true
     }
 
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.auto_option -> {
+            R.id.reboot -> {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle( getString(R.string.on_reboot))
+                builder.setPositiveButton(getString(R.string.dialog_ok)) { _, _ -> reboot() }
+                builder.setNegativeButton(getString(R.string.dialog_cancel)) { dialog, _ -> dialog.cancel() }
+                builder.show()
+            }
+            R.id.config -> {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle(getString(R.string.set_port))
+                val input = EditText(this)
+                input.inputType = InputType.TYPE_CLASS_NUMBER
+                input.setText(port.toString())
+                builder.setView(input)
+                builder.setPositiveButton(getString(R.string.dialog_ok)) { _, _ -> setPort(input.text.toString().toInt()); }
+                builder.setNegativeButton(getString(R.string.dialog_cancel)) { dialog, _ -> dialog.cancel() }
+                builder.show()
             }
         }
         return super.onOptionsItemSelected(item)
     }
 
-    private fun listen(port: Int) {
-        ssc = ServerSocketChannel.open()
-        ssc.socket().bind(InetSocketAddress(port))
-        while (true) {
-            val sc = ssc.accept()
-            channels.add(sc)
+    private fun setPort(port: Int) {
+        if(port==this.port){
+            return
         }
+        this.port = port
+        txtPort.text = port.toString()
+        defaultSharedPreferences.edit().putInt("port",port).apply()
+        stopServer()
+        listen(port)
+    }
+
+    private fun stopServer() {
+        ssc.close()
+        channels.forEach { closeQuietly(it) }
+        channels.clear()
+        updateClients(0)
+    }
+
+
+    /**
+     * toast without waiting for previous toast
+     */
+    private fun imToast(message: CharSequence){
+        if(toast!=null){
+            toast!!.cancel()
+        }
+        toast=toast(message)
+
+    }
+    private fun send(barcode: String) {
+        if (barcode.isEmpty()) {
+            imToast(getString(R.string.no_barcode_to_send))
+            return
+        }
+        if (channels.isEmpty()) {
+            imToast(getString(R.string.no_clients_to_send))
+            return
+        }
+        imToast(getString(R.string.barcode_sent))
+        adapter.add(barcode)
+        listHistory.smoothScrollToPosition(adapter.count-1)
+        queue.put(txtBarcode.text as String)
     }
 
     private fun onResult(barcode: String) {
-        println(barcode)
+        info(barcode)
         runOnUiThread {
             txtBarcode.text = barcode
-            adapter.add(barcode)
         }
         if (autoSend) {
-            queue.put(barcode)
+            send(barcode)
         }
     }
 
-    private fun sendLoop() {
-        while (true) {
-            val msg = queue.take() + "\n"
-            val bb = ByteBuffer.wrap(msg.toByteArray())
-            channels.forEach { channel ->
-                bb.rewind()
-                try {
-                    channel.write(bb)
-                } catch (e: Exception) {
-                    channels.remove(channel)
-                    debug(e)
+    private fun closeQuietly(o: Closeable) = try {
+        o.close()
+    } catch (e: Exception) {
+    }
+
+    private fun clearHistory() {
+        txtBarcode.text = null
+        adapter.clear()
+        updateSent(0)
+    }
+
+    private fun updateClients(clients: Int) = runOnUiThread { txtClients.text = clients.toString() }
+    private fun updateSent(sent: Int) = runOnUiThread { txtSent.text = sent.toString() }
+
+
+    private fun listen(port: Int) {
+        updateClients(0)
+        listenThread = Thread {
+            try {
+                ssc = ServerSocketChannel.open()
+                ssc.socket().bind(InetSocketAddress(port))
+                while (true) {
+                    val sc = ssc.accept()
+                    channels.add(sc)
+                    updateClients(channels.count())
                 }
+            } catch (e: Exception) {
+                info(e)
+            } finally {
+                closeQuietly(ssc)
             }
         }
+        listenThread.start()
     }
 
 
+    private fun sendLoop() {
+        sendThread = Thread {
+            channels.clear()
+            while (true) {
+                val barcode: String = queue.take()
+                val msg = barcode + "\n"
+                val bb = ByteBuffer.wrap(msg.toByteArray())
+                channels.forEach { channel ->
+                    bb.rewind()
+                    try {
+                        channel.write(bb)
+                    } catch (e: Exception) {
+                        closeQuietly(channel)
+                        channels.remove(channel)
+                        debug(e)
+                    }
+                }
+
+                // update stat
+                runOnUiThread {
+                    txtSent.text = adapter.count.toString()
+                    txtClients.text = channels.count().toString()
+                }
+            }
+
+        }
+        sendThread.start()
+    }
+
+    private fun reboot() {
+        stopServer()
+        val intent = packageManager.getLaunchIntentForPackage(packageName)!!;
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent);
+    }
 }
 
 class HistoryListAdapter(context: Context, resource: Int, objects: MutableList<String>) :
     ArrayAdapter<String>(context, resource, objects) {
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view = convertView ?: View.inflate(context, R.layout.item_list_history, parent)
+        val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_list_history, null)
         val barcode = this.getItem(position)
         view.find<TextView>(R.id.text).text = barcode
         return view
